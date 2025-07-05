@@ -30,15 +30,52 @@
 - 浏览器指纹隐藏
 - 智能重试机制
 
-## 安装依赖
+## 🚀 快速开始
+
+### 一键安装
 
 ```bash
-pip install -r requirements.txt
+# 运行一键安装脚本
+python install.py
 ```
 
-## 快速开始
+安装脚本会自动完成：
+- ✅ 检查Python版本（需要3.7+）
+- ✅ 安装所有依赖包
+- ✅ 检查Chrome浏览器
+- ✅ 创建必要目录
+- ✅ 测试安装
 
-### 1. 基础使用
+### 手动安装
+
+如果自动安装失败，可以手动安装：
+
+```bash
+# 安装依赖包
+pip install -r requirements.txt
+
+# 确保已安装Chrome浏览器
+# Windows/macOS: 从 https://www.google.com/chrome/ 下载
+# Linux: sudo apt install google-chrome-stable
+```
+
+## 使用方法
+
+### 1. 快速测试
+
+```bash
+python test_crawler.py
+```
+
+### 2. 交互式使用
+
+```bash
+python main.py
+```
+
+按照提示输入搜索关键词和筛选条件即可。
+
+### 3. 编程使用
 
 ```python
 from amazon_crawler import AmazonCrawler
@@ -68,7 +105,7 @@ finally:
     crawler.close()
 ```
 
-### 2. 高级使用
+### 4. 高级使用
 
 ```python
 from advanced_crawler import AdvancedAmazonCrawler
@@ -107,14 +144,6 @@ try:
 finally:
     crawler.close()
 ```
-
-### 3. 交互式使用
-
-```bash
-python main.py
-```
-
-按照提示输入搜索关键词和筛选条件即可。
 
 ## 筛选条件说明
 

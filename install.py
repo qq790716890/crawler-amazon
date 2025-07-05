@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-亚马逊爬虫项目安装脚本
+亚马逊爬虫项目 - 一键安装脚本
 """
 
 import os
@@ -10,26 +10,37 @@ import sys
 import subprocess
 import platform
 
+def print_banner():
+    """打印安装横幅"""
+    print("=" * 50)
+    print("    亚马逊爬虫项目 - 一键安装")
+    print("=" * 50)
+    print()
+
 def check_python_version():
     """检查Python版本"""
+    print("🐍 检查Python版本...")
     version = sys.version_info
     if version.major < 3 or (version.major == 3 and version.minor < 7):
-        print("❌ 错误: 需要Python 3.7或更高版本")
+        print(f"❌ 错误: 需要Python 3.7或更高版本")
         print(f"当前版本: {version.major}.{version.minor}.{version.micro}")
         return False
     
-    print(f"✅ Python版本检查通过: {version.major}.{version.minor}.{version.micro}")
+    print(f"✅ Python版本: {version.major}.{version.minor}.{version.micro}")
     return True
 
 def install_dependencies():
     """安装依赖包"""
-    print("\n📦 正在安装依赖包...")
+    print("\n📦 安装依赖包...")
     
     try:
         # 升级pip
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "pip"])
+        print("升级pip...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "pip"], 
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         # 安装依赖
+        print("安装项目依赖...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
         
         print("✅ 依赖包安装成功")
@@ -66,11 +77,12 @@ def check_chrome():
             print(f"✅ 找到Chrome浏览器: {path}")
             return True
     
-    print("⚠️  未找到Chrome浏览器，请手动安装:")
+    print("⚠️  未找到Chrome浏览器")
+    print("请手动安装Chrome浏览器:")
     if system == "windows":
-        print("   下载地址: https://www.google.com/chrome/")
+        print("   https://www.google.com/chrome/")
     elif system == "darwin":
-        print("   下载地址: https://www.google.com/chrome/")
+        print("   https://www.google.com/chrome/")
     else:
         print("   Ubuntu/Debian: sudo apt install google-chrome-stable")
         print("   CentOS/RHEL: sudo yum install google-chrome-stable")
@@ -95,18 +107,16 @@ def test_installation():
     print("\n🧪 测试安装...")
     
     try:
-        # 测试导入
+        # 测试导入核心包
         import selenium
         import pandas
-        import requests
         from fake_useragent import UserAgent
-        
-        print("✅ 所有依赖包导入成功")
+        print("✅ 核心依赖包导入成功")
         
         # 测试ChromeDriver
         from webdriver_manager.chrome import ChromeDriverManager
         driver_path = ChromeDriverManager().install()
-        print(f"✅ ChromeDriver安装成功: {driver_path}")
+        print(f"✅ ChromeDriver安装成功")
         
         return True
         
@@ -117,24 +127,20 @@ def test_installation():
         print(f"❌ 测试失败: {e}")
         return False
 
-def show_usage_examples():
-    """显示使用示例"""
-    print("\n📖 使用示例:")
-    print("=" * 50)
+def show_usage():
+    """显示使用说明"""
+    print("\n📖 使用说明:")
+    print("=" * 40)
     
-    print("1. 交互式使用:")
-    print("   python main.py")
-    print()
-    
-    print("2. 基础爬虫:")
-    print("   python example.py")
-    print()
-    
-    print("3. 测试功能:")
+    print("1. 快速测试:")
     print("   python test_crawler.py")
     print()
     
-    print("4. 编程使用:")
+    print("2. 交互式使用:")
+    print("   python main.py")
+    print()
+    
+    print("3. 编程使用:")
     print("   from amazon_crawler import AmazonCrawler")
     print("   crawler = AmazonCrawler()")
     print("   products = crawler.search_products('laptop')")
@@ -142,16 +148,16 @@ def show_usage_examples():
 
 def main():
     """主安装函数"""
-    print("=" * 60)
-    print("          亚马逊爬虫项目安装向导")
-    print("=" * 60)
+    print_banner()
     
     # 检查Python版本
     if not check_python_version():
+        print("\n❌ Python版本不满足要求，安装终止")
         return False
     
     # 安装依赖
     if not install_dependencies():
+        print("\n❌ 依赖包安装失败，请检查网络连接")
         return False
     
     # 检查Chrome
@@ -162,19 +168,18 @@ def main():
     
     # 测试安装
     if not test_installation():
-        print("❌ 安装测试失败，请检查错误信息")
+        print("\n❌ 安装测试失败")
         return False
     
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 50)
     print("🎉 安装完成！")
-    print("=" * 60)
+    print("=" * 50)
     
-    show_usage_examples()
+    show_usage()
     
     print("📝 注意事项:")
-    print("- 请确保网络连接正常")
     print("- 首次运行会自动下载ChromeDriver")
-    print("- 建议在虚拟环境中运行")
+    print("- 请确保网络连接正常")
     print("- 遵守网站使用条款")
     
     return True
