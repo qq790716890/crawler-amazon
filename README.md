@@ -46,6 +46,25 @@ python install.py
 - ✅ 创建必要目录
 - ✅ 测试安装
 
+### ChromeDriver 配置
+
+**重要**: 由于网络环境限制，ChromeDriver 可能需要手动配置。
+
+#### 自动配置（推荐）
+```bash
+python setup_chromedriver.py
+```
+
+#### 智能集成
+爬虫会自动检测ChromeDriver是否可用，如果不可用会自动运行配置脚本：
+```python
+from amazon_crawler import AmazonCrawler
+crawler = AmazonCrawler()  # 自动处理ChromeDriver配置
+```
+
+#### 手动配置
+如果自动配置失败，请参考 [ChromeDriver 配置指南](README_ChromeDriver.md)
+
 ### 手动安装
 
 如果自动安装失败，可以手动安装：

@@ -35,10 +35,10 @@ class AmazonCrawler:
         """设置Chrome浏览器驱动"""
         try:
             chrome_options = Options()
-            
+
             if self.headless:
                 chrome_options.add_argument("--headless")
-            
+
             # 添加反检测参数
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
@@ -46,12 +46,24 @@ class AmazonCrawler:
             chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
             chrome_options.add_experimental_option('useAutomationExtension', False)
             chrome_options.add_argument(f"--user-agent={self.ua.random}")
-            
-            # 自动下载并设置ChromeDriver
-            driver_path = ChromeDriverManager().install()
-            
+            driver_path = None  # 初始化路径变量
+            # 尝试运行ChromeDriver配置脚本
+            try:
+                from setup_chromedriver import setup_chromedriver_auto, check_chromedriver_exists
+
+                if setup_chromedriver_auto():
+                    logger.info("ChromeDriver配置成功")
+                    # 配置成功后再次检查本地路径
+                    existing_path = check_chromedriver_exists()
+                    driver_path = existing_path
+                else:
+                    driver_path = ChromeDriverManager().install()
+            except Exception as e:
+                logger.error(f"运行ChromeDriver配置脚本时出错: {e}")
+                raise Exception("ChromeDriver配置失败")
+
             # 修复ChromeDriver路径问题 - 更精确的修复
-            if os.path.isdir(driver_path):
+            if driver_path and os.path.isdir(driver_path):
                 # 如果是目录，查找chromedriver可执行文件
                 possible_paths = [
                     os.path.join(driver_path, "chromedriver"),
@@ -59,40 +71,24 @@ class AmazonCrawler:
                     os.path.join(driver_path, "chromedriver.exe"),
                     os.path.join(driver_path, "chromedriver-linux64", "chromedriver-linux64")
                 ]
-                
+
                 for path in possible_paths:
                     if os.path.exists(path) and os.access(path, os.X_OK):
                         driver_path = path
                         break
-                else:
-                    # 如果找不到可执行文件，尝试在目录中查找
-                    for root, dirs, files in os.walk(driver_path):
-                        for file in files:
-                            if file.startswith("chromedriver") and not file.endswith(".txt") and not file.endswith(".chromedriver"):
-                                full_path = os.path.join(root, file)
-                                if os.access(full_path, os.X_OK):
-                                    driver_path = full_path
-                                    break
-                        if driver_path != ChromeDriverManager().install():
-                            break
-            
-            # 额外的检查：如果路径仍然指向THIRD_PARTY_NOTICES文件，手动修复
-            if "THIRD_PARTY_NOTICES" in driver_path:
-                # 尝试找到正确的chromedriver文件
-                base_dir = os.path.dirname(driver_path)
-                correct_path = os.path.join(base_dir, "chromedriver")
-                if os.path.exists(correct_path) and os.access(correct_path, os.X_OK):
-                    driver_path = correct_path
-                    logger.info(f"修复ChromeDriver路径: {driver_path}")
-            
+                    
+            # 确保driver_path不为None
+            if not driver_path:
+                raise Exception("无法找到有效的ChromeDriver路径")
+
             logger.info(f"使用ChromeDriver路径: {driver_path}")
-            
+
             service = Service(driver_path)
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            
+
             # 执行反检测脚本
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-            
+
             logger.info("Chrome驱动设置成功")
             
         except Exception as e:
@@ -153,7 +149,7 @@ class AmazonCrawler:
         try:
             # 查找所有商品容器 - 使用新的选择器
             product_containers = self.driver.find_elements(By.CSS_SELECTOR, "[data-component-type='s-search-result']")
-            
+
             logger.info(f"找到 {len(product_containers)} 个商品容器")
             
             for i, container in enumerate(product_containers):
@@ -179,20 +175,14 @@ class AmazonCrawler:
             product_name = "N/A"
             product_url = "N/A"
             try:
-                # 使用正确的选择器获取商品名称和链接
-                title_element = container.find_element(By.CSS_SELECTOR, ".a-link-normal.s-line-clamp-4")
-                if title_element:
-                    product_url = title_element.get_attribute("href") or "N/A"
-                    product_name = title_element.text.strip()
-                else:
-                    # 备选方案：使用.a-text-normal选择器
-                    try:
-                        title_element = container.find_element(By.CSS_SELECTOR, ".a-text-normal")
-                        if title_element:
-                            product_name = title_element.text.strip()
-                    except:
-                        pass
-                        
+                # 优先用 data-cy="title-recipe" 下的 a 标签
+                title_elem = container.find_element(By.CSS_SELECTOR, '[data-cy="title-recipe"] a.a-link-normal')
+                if title_elem:
+                    product_url = title_elem.get_attribute("href") or "N/A"
+                    # 补全相对链接
+                    if product_url.startswith("/"):
+                        product_url = "https://www.amazon.sg" + product_url
+                    product_name = title_elem.text.strip()
             except Exception as e:
                 logger.debug(f"提取商品名称时出错: {e}")
                 # 备选方案：使用.a-text-normal选择器
@@ -202,142 +192,90 @@ class AmazonCrawler:
                         product_name = title_element.text.strip()
                 except:
                     pass
-            
-            # 价格 - 使用正确的选择器组合
+
+            # 价格
             price = "N/A"
             try:
-                # 尝试获取完整价格
-                price_element = container.find_element(By.CSS_SELECTOR, ".a-price .a-offscreen")
-                if price_element:
-                    price = price_element.get_attribute("innerHTML").strip()
-                else:
-                    # 如果无法获取完整价格，尝试组合整数和小数部分
-                    try:
-                        whole_element = container.find_element(By.CSS_SELECTOR, ".a-price-whole")
-                        fraction_element = container.find_element(By.CSS_SELECTOR, ".a-price-fraction")
-                        symbol_element = container.find_element(By.CSS_SELECTOR, ".a-price-symbol")
-                        
-                        whole = whole_element.text.strip() if whole_element else ""
-                        fraction = fraction_element.text.strip() if fraction_element else ""
-                        symbol = symbol_element.text.strip() if symbol_element else ""
-                        
-                        if whole:
-                            price = f"{symbol}{whole}"
-                            if fraction:
-                                price += f".{fraction}"
-                    except:
-                        pass
-                        
+                price_elem = container.find_element(By.CSS_SELECTOR, ".a-price .a-offscreen")
+                if price_elem:
+                    price = price_elem.text.strip()
             except Exception as e:
                 logger.debug(f"提取价格时出错: {e}")
-            
-            # 评分 - 使用正确的评分结构
+
+            # 评分
             rating = "N/A"
             try:
-                rating_element = container.find_element(By.CSS_SELECTOR, "i.a-icon-star-small .a-icon-alt")
-                if rating_element:
-                    rating_text = rating_element.get_attribute("innerHTML")
-                    # 提取评分数字，如 "4.3 out of 5 stars"
+                rating_elem = container.find_element(By.CSS_SELECTOR, "i.a-icon-star-small span.a-icon-alt")
+                if rating_elem:
+                    rating_text = rating_elem.get_attribute("innerHTML") or rating_elem.text
                     rating_match = re.search(r'(\d+\.?\d*)', rating_text)
                     if rating_match:
                         rating = rating_match.group(1)
-                        
             except Exception as e:
                 logger.debug(f"提取评分时出错: {e}")
-            
-            # 评论数 - 使用正确的评论结构
+
+            # 评论数
             reviews = "N/A"
             try:
-                reviews_element = container.find_element(By.CSS_SELECTOR, "a[aria-label*='ratings'] span")
-                if reviews_element:
-                    reviews_text = reviews_element.text.strip()
-                    # 提取数字，处理逗号分隔符
-                    reviews_match = re.search(r'([\d,]+)', reviews_text)
-                    if reviews_match:
-                        reviews = reviews_match.group(1).replace(',', '')
-                        
+                review_elem = container.find_element(By.CSS_SELECTOR, 'span.a-size-base.s-underline-text')
+                if review_elem:
+                    reviews = review_elem.text.strip().replace(',', '')
             except Exception as e:
                 logger.debug(f"提取评论数时出错: {e}")
-            
-            # ASIN (Amazon Standard Identification Number)
+
+            # ASIN
             asin = "N/A"
             try:
                 asin = container.get_attribute("data-asin")
             except:
                 pass
-            
+
             # 商品图片URL
             image_url = "N/A"
             try:
-                img_selectors = [
-                    ".s-image",
-                    "img[data-image-index]",
-                    "img[src*='media-amazon']"
-                ]
-                
-                for selector in img_selectors:
-                    try:
-                        img_element = container.find_element(By.CSS_SELECTOR, selector)
-                        if img_element:
-                            image_url = img_element.get_attribute("src")
-                            if image_url:
-                                break
-                    except:
-                        continue
-                        
+                img_elem = container.find_element(By.CSS_SELECTOR, "img.s-image")
+                if img_elem:
+                    image_url = img_elem.get_attribute("src")
             except Exception as e:
                 logger.debug(f"提取图片URL时出错: {e}")
-            
+
             # 促销信息
             promotion = "N/A"
             try:
-                promotion_selectors = [
-                    ".a-row.a-size-base.a-color-secondary span",
-                    ".a-color-secondary span",
-                    "[class*='promotion']"
-                ]
-                
-                for selector in promotion_selectors:
-                    try:
-                        promotion_element = container.find_element(By.CSS_SELECTOR, selector)
-                        if promotion_element:
-                            promotion = promotion_element.text.strip()
-                            if promotion and promotion != "N/A":
-                                break
-                    except:
-                        continue
-                        
+                # 优先找价格下方的 strike-through 价格（如标准价、市场价等）
+                promo_elem = container.find_element(By.CSS_SELECTOR, ".a-price.a-text-price .a-offscreen")
+                if promo_elem:
+                    promotion = promo_elem.text.strip()
+                else:
+                    # 备选：找促销相关的span
+                    promo_span = container.find_element(By.CSS_SELECTOR, ".a-size-base.a-color-secondary")
+                    if promo_span:
+                        promotion = promo_span.text.strip()
             except Exception as e:
                 logger.debug(f"提取促销信息时出错: {e}")
-            
+
             # 配送信息
             delivery = "N/A"
             try:
-                delivery_selectors = [
-                    ".udm-primary-delivery-message",
-                    ".a-color-base.udm-primary-delivery-message",
-                    "[class*='delivery']"
-                ]
-                
-                for selector in delivery_selectors:
-                    try:
-                        delivery_element = container.find_element(By.CSS_SELECTOR, selector)
-                        if delivery_element:
-                            delivery = delivery_element.text.strip()
-                            if delivery and delivery != "N/A":
-                                break
-                    except:
-                        continue
-                        
+                # 优先找data-cy="delivery-recipe"下的内容
+                delivery_elem = container.find_element(By.CSS_SELECTOR, '[data-cy="delivery-recipe"] .a-row.a-size-base.a-color-secondary')
+                if delivery_elem:
+                    delivery = delivery_elem.text.strip()
+                else:
+                    # 备选：找包含“配送”字样的span
+                    delivery_spans = container.find_elements(By.CSS_SELECTOR, 'span')
+                    for span in delivery_spans:
+                        text = span.text.strip()
+                        if "配送" in text or "送达" in text:
+                            delivery = text
+                            break
             except Exception as e:
                 logger.debug(f"提取配送信息时出错: {e}")
-            
-            # 店铺名称 - 亚马逊自营商品可能没有店铺信息
+
+            # 店铺名称、店铺评分保持原样
             store_name = "Amazon"
-            
-            # 店铺评分 - 亚马逊自营商品可能没有店铺评分
             store_rating = "N/A"
-            
+
             return {
                 "商品名称": product_name,
                 "商品链接": product_url,
@@ -351,7 +289,6 @@ class AmazonCrawler:
                 "店铺名称": store_name,
                 "店铺评分": store_rating
             }
-            
         except Exception as e:
             logger.warning(f"提取商品信息时出错: {e}")
             return None

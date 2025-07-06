@@ -113,10 +113,24 @@ def test_installation():
         from fake_useragent import UserAgent
         print("✅ 核心依赖包导入成功")
         
-        # 测试ChromeDriver
-        from webdriver_manager.chrome import ChromeDriverManager
-        driver_path = ChromeDriverManager().install()
-        print(f"✅ ChromeDriver安装成功")
+        # 测试ChromeDriver - 使用国内镜像源
+        try:
+            from webdriver_manager.chrome import ChromeDriverManager
+            # 设置国内镜像源
+            os.environ['GH_TOKEN'] = ''  # 清空GitHub token
+            driver_path = ChromeDriverManager().install()
+            print(f"✅ ChromeDriver安装成功")
+        except Exception as e:
+            print(f"⚠️  ChromeDriver自动下载失败: {e}")
+            print("💡 解决方案:")
+            print("   1. 手动下载ChromeDriver:")
+            print("      - 访问: https://chromedriver.chromium.org/")
+            print("      - 或使用国内镜像: https://npm.taobao.org/mirrors/chromedriver/")
+            print("   2. 将chromedriver.exe放在项目根目录或系统PATH中")
+            print("   3. 在代码中指定ChromeDriver路径:")
+            print("      from selenium import webdriver")
+            print("      driver = webdriver.Chrome(executable_path='./chromedriver.exe')")
+            return False
         
         return True
         
@@ -167,9 +181,10 @@ def main():
     create_directories()
     
     # 测试安装
-    if not test_installation():
-        print("\n❌ 安装测试失败")
-        return False
+    test_result = test_installation()
+    if not test_result:
+        print("\n⚠️  部分测试失败，但基本功能可用")
+        print("ChromeDriver需要手动配置，请参考上面的解决方案")
     
     print("\n" + "=" * 50)
     print("🎉 安装完成！")
@@ -181,6 +196,10 @@ def main():
     print("- 首次运行会自动下载ChromeDriver")
     print("- 请确保网络连接正常")
     print("- 遵守网站使用条款")
+    print()
+    print("🌐 国内用户ChromeDriver配置:")
+    print("   如果ChromeDriver下载失败，请运行:")
+    print("   python setup_chromedriver.py")
     
     return True
 

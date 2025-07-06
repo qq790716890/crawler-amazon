@@ -1,4 +1,5 @@
 import time
+import sys
 
 from fake_useragent import UserAgent
 from selenium import webdriver
@@ -41,12 +42,24 @@ class Test1:
             chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
             chrome_options.add_experimental_option('useAutomationExtension', False)
             chrome_options.add_argument(f"--user-agent={self.ua.random}")
+            driver_path = None  # 初始化路径变量
+            # 尝试运行ChromeDriver配置脚本
+            try:
+                from setup_chromedriver import setup_chromedriver_auto, check_chromedriver_exists
 
-            # 自动下载并设置ChromeDriver
-            driver_path = ChromeDriverManager().install()
+                if setup_chromedriver_auto():
+                    logger.info("ChromeDriver配置成功")
+                    # 配置成功后再次检查本地路径
+                    existing_path = check_chromedriver_exists()
+                    driver_path = existing_path
+                else:
+                    driver_path = ChromeDriverManager().install()
+            except Exception as e:
+                logger.error(f"运行ChromeDriver配置脚本时出错: {e}")
+                raise Exception("ChromeDriver配置失败")
 
             # 修复ChromeDriver路径问题 - 更精确的修复
-            if os.path.isdir(driver_path):
+            if driver_path and os.path.isdir(driver_path):
                 # 如果是目录，查找chromedriver可执行文件
                 possible_paths = [
                     os.path.join(driver_path, "chromedriver"),
@@ -59,27 +72,10 @@ class Test1:
                     if os.path.exists(path) and os.access(path, os.X_OK):
                         driver_path = path
                         break
-                else:
-                    # 如果找不到可执行文件，尝试在目录中查找
-                    for root, dirs, files in os.walk(driver_path):
-                        for file in files:
-                            if file.startswith("chromedriver") and not file.endswith(".txt") and not file.endswith(
-                                    ".chromedriver"):
-                                full_path = os.path.join(root, file)
-                                if os.access(full_path, os.X_OK):
-                                    driver_path = full_path
-                                    break
-                        if driver_path != ChromeDriverManager().install():
-                            break
-
-            # 额外的检查：如果路径仍然指向THIRD_PARTY_NOTICES文件，手动修复
-            if "THIRD_PARTY_NOTICES" in driver_path:
-                # 尝试找到正确的chromedriver文件
-                base_dir = os.path.dirname(driver_path)
-                correct_path = os.path.join(base_dir, "chromedriver")
-                if os.path.exists(correct_path) and os.access(correct_path, os.X_OK):
-                    driver_path = correct_path
-                    logger.info(f"修复ChromeDriver路径: {driver_path}")
+                    
+            # 确保driver_path不为None
+            if not driver_path:
+                raise Exception("无法找到有效的ChromeDriver路径")
 
             logger.info(f"使用ChromeDriver路径: {driver_path}")
 
@@ -102,7 +98,8 @@ class Test1:
         return self.driver
 
 if __name__ == '__main__':
-    driver = Test1(False).get_driver()
+    test_instance = Test1(False)
+    driver = test_instance.get_driver()
     driver.get("https://www.baidu.com")
     time.sleep(5)
     driver.maximize_window()
